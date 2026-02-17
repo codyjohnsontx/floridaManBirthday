@@ -1,6 +1,6 @@
 # Florida Man Birthday
 
-A tiny web app that lets you pick your birthday and returns a matching **Florida Man** headline.
+A tiny web app that lets you pick your birthday and returns a matching **Florida Man** link.
 
 ## Run locally
 
@@ -14,5 +14,5 @@ Then open <http://localhost:4173>.
 
 - Uses month/day dropdowns and adapts day count for each month.
 - Month/day options are included directly in HTML so dropdowns remain usable in strict preview environments.
-- Attempts multiple known Florida Man API endpoints for compatibility.
-- Displays a source link when the API returns one.
+- Uses a local `birthdays.json` file with an entry for every calendar day (including Feb 29).
+- Displays a source link for the selected date.

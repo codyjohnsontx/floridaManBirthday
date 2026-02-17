@@ -9,18 +9,8 @@ var error = document.querySelector('#error');
 var submitButton = form.querySelector('button[type="submit"]');
 
 var DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-var API_CANDIDATES = [
-  function (month, day) {
-    return 'https://floridamanapi.com/api/v1/date/' + month + '-' + day;
-  },
-  function (month, day) {
-    return 'https://floridamanapi.herokuapp.com/' + month + '/' + day;
-  },
-  function (month, day) {
-    return 'https://floridamanapi.herokuapp.com/?date=' + month + '/' + day;
-  },
-];
+var BIRTHDAY_DATA_URL = './birthdays.json';
+var birthdayDataPromise = null;
 
 function populateDays(daysInMonth) {
   var previous = daySelect.value || '01';
@@ -59,79 +49,38 @@ function setLoading(isLoading) {
   submitButton.textContent = isLoading ? 'Loading...' : 'Show Headline';
 }
 
-function firstString(candidates) {
-  for (var i = 0; i < candidates.length; i += 1) {
-    if (typeof candidates[i] === 'string' && candidates[i].trim() !== '') {
-      return candidates[i];
-    }
-  }
-  return '';
-}
-
-function normalizeHeadlineData(data) {
-  var nested = data && data.data ? data.data : null;
-  var article = data && data.article ? data.article : null;
-  var news = data && data.news ? data.news : null;
-
-  var value = firstString([
-    data && data.headline,
-    data && data.title,
-    nested && nested.headline,
-    nested && nested.title,
-    article && article.title,
-    news && news.headline,
-  ]);
-
-  var source = firstString([
-    data && data.url,
-    data && data.link,
-    data && data.source,
-    nested && nested.url,
-    article && article.url,
-  ]);
-
-  if (!value) {
-    throw new Error('The API responded but did not include a headline.');
+function getBirthdayData() {
+  if (!birthdayDataPromise) {
+    birthdayDataPromise = fetch(BIRTHDAY_DATA_URL)
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('Could not load birthday data (' + response.status + ').');
+        }
+        return response.json();
+      })
+      .catch(function (err) {
+        birthdayDataPromise = null;
+        throw err;
+      });
   }
 
-  return { headline: value, source: source };
+  return birthdayDataPromise;
 }
 
-function renderHeadline(data, month, day) {
+function renderEntry(entry, month, day) {
   resultDate.textContent = 'Your Florida Man story for ' + month + '/' + day;
-  headline.textContent = data.headline;
+  headline.textContent = entry.headline || 'Open your Florida Man link:';
 
-  if (data.source) {
+  if (entry.url) {
     headlineLink.hidden = false;
-    headlineLink.href = data.source;
+    headlineLink.href = entry.url;
+    headlineLink.textContent = 'Read source';
   } else {
     headlineLink.hidden = true;
     headlineLink.removeAttribute('href');
   }
 
   result.hidden = false;
-}
-
-async function fetchHeadline(month, day) {
-  var lastError = null;
-
-  for (var i = 0; i < API_CANDIDATES.length; i += 1) {
-    var url = API_CANDIDATES[i](month, day);
-
-    try {
-      var response = await fetch(url, { mode: 'cors' });
-      if (!response.ok) {
-        lastError = new Error('Request failed with status ' + response.status);
-        continue;
-      }
-      var data = await response.json();
-      return normalizeHeadlineData(data);
-    } catch (err) {
-      lastError = err;
-    }
-  }
-
-  throw lastError || new Error('No Florida Man API endpoints succeeded.');
 }
 
 async function onSubmit(event) {
@@ -142,12 +91,19 @@ async function onSubmit(event) {
 
   var month = monthSelect.value;
   var day = daySelect.value;
+  var dateKey = month + '-' + day;
 
   try {
-    var data = await fetchHeadline(month, day);
-    renderHeadline(data, month, day);
+    var birthdayData = await getBirthdayData();
+    var entry = birthdayData[dateKey];
+
+    if (!entry || !entry.url) {
+      throw new Error('No weblink found for ' + dateKey + '.');
+    }
+
+    renderEntry(entry, month, day);
   } catch (err) {
-    showError('Could not find a headline right now. ' + err.message);
+    showError('Could not load birthday link right now. ' + err.message);
   } finally {
     setLoading(false);
   }
